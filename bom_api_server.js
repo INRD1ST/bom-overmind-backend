@@ -130,8 +130,9 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/search', (req, res) => {
     try {
         const q = (req.query.q || '').toLowerCase().trim();
-        if (!q) return res.status(400).json({ error: 'Missing query parameter: q', status: 400 });
-        const db      = readDB();
+        const db = readDB();
+        // Empty q = return all records (used by Mother AI "show all" command)
+        if (!q) return res.json({ query: '', count: db.length, results: db });
         const results = db.filter(r => {
             const inNamespace = (r.namespace     || '').toLowerCase().includes(q);
             const inBusiness  = (r.businessName  || '').toLowerCase().includes(q);

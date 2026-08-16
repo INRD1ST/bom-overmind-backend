@@ -199,37 +199,45 @@ async function bootWatcher() {
         }
     }
 
+const MAX_BLOCK_CHUNK = 2000;
+const START_BLOCK     = process.env.START_BLOCK ? parseInt(process.env.START_BLOCK) : 11500000;
+
     // ── One poll cycle ─────────────────────────────────────
     async function poll() {
         try {
             const currentBlock = await provider.getBlockNumber();
             if (currentBlock <= lastBlock) return;
 
-            const fromBlock = lastBlock + 1;
-            const toBlock   = currentBlock;
+            let fromBlock = lastBlock + 1;
+            let totalEvents = 0;
 
-            const logs = await provider.getLogs({
-                address:   CONTRACT_ADDRESS,
-                fromBlock,
-                toBlock,
-            });
+            while (fromBlock <= currentBlock) {
+                const toBlock = Math.min(fromBlock + MAX_BLOCK_CHUNK - 1, currentBlock);
+                const logs = await provider.getLogs({
+                    address:   CONTRACT_ADDRESS,
+                    fromBlock,
+                    toBlock,
+                });
 
-            for (const log of logs) {
-                try {
-                    const parsed = iface.parseLog({ topics: log.topics, data: log.data });
-                    if (parsed) await handleLog(parsed, log.blockNumber);
-                } catch {
-                    // unknown event signature — skip silently
+                for (const log of logs) {
+                    try {
+                        const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+                        if (parsed) await handleLog(parsed, log.blockNumber);
+                    } catch {
+                        // unknown event signature — skip silently
+                    }
                 }
+
+                totalEvents += logs.length;
+                lastBlock = toBlock;
+                fromBlock = toBlock + 1;
             }
 
-            if (logs.length > 0) {
-                console.log(`[POLL] ✅ Blocks #${fromBlock}–${toBlock} | ${logs.length} event(s) found`);
+            if (totalEvents > 0) {
+                console.log(`[POLL] ✅ Synced up to #${currentBlock} | ${totalEvents} event(s) processed`);
             } else {
-                process.stdout.write(`\r[POLL] Block #${toBlock} — listening...          `);
+                process.stdout.write(`\r[POLL] Block #${currentBlock} — listening...          `);
             }
-
-            lastBlock = toBlock;
         } catch (err) {
             console.error(`\n[POLL] ⚠️  getLogs error: ${err.message} — retrying next cycle`);
             // Do NOT update lastBlock — will retry same range next cycle
@@ -242,9 +250,13 @@ async function bootWatcher() {
             provider  = new ethers.JsonRpcProvider(RPC_URL);
             const net = await provider.getNetwork();
             iface     = new ethers.Interface(CONTRACT_ABI);
-            lastBlock = (await provider.getBlockNumber()) - 1;
 
-            console.log(`[AGT-0004] ✅ Connected — Chain ID: ${net.chainId} | Start block: ${lastBlock + 1}`);
+            const currentBlock = await provider.getBlockNumber();
+            lastBlock = START_BLOCK && START_BLOCK > 0
+                ? Math.min(START_BLOCK - 1, currentBlock - 1)
+                : Math.max(0, currentBlock - 5000);
+
+            console.log(`[AGT-0004] ✅ Connected — Chain ID: ${net.chainId} | Current: #${currentBlock} | Backfill start: #${lastBlock + 1}`);
             console.log(`[AGT-0004] 🔁 Polling FNS contract every ${POLL_INTERVAL / 1000}s via getLogs`);
             console.log(`[AGT-0004] 📋 Contract: ${CONTRACT_ADDRESS}\n`);
 

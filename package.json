@@ -1,0 +1,29 @@
+{
+  "name": "bom-overmind",
+  "version": "2.0.0",
+  "description": "BOM Protocol — Overmind V2. Autonomous AI agent swarm for sovereign internet infrastructure.",
+  "main": "bom_watcher_agent.js",
+  "scripts": {
+    "start": "node bom_watcher_agent.js",
+    "dev": "node bom_watcher_agent.js",
+    "boot": "node bom_watcher_agent.js"
+  },
+  "keywords": [
+    "bom",
+    "protocol",
+    "overmind",
+    "agent",
+    "ethereum",
+    "ai"
+  ],
+  "author": "BOM Protocol — Chief Architect",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "ethers": "^6.17.0",
+    "express": "^5.2.1"
+  }
+}

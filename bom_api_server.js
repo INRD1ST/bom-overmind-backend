@@ -35,8 +35,8 @@ let geminiModel = null;
 if (GoogleGenerativeAI && GEMINI_API_KEY) {
     try {
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        console.log('[AI] Mother AI brain initialized — model: gemini-1.5-flash');
+        geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        console.log('[AI] Mother AI brain initialized — model: gemini-2.0-flash');
     } catch (err) {
         console.warn('[AI] Gemini initialization failed:', err.message);
     }
@@ -287,7 +287,7 @@ RULES:
             const names = db.slice(0, 20).map(r => r.namespace.toUpperCase()).join(', ');
             return res.json({ reply: `Indexed FNS names (${db.length} total): ${names || 'none yet'}.`, source: 'db-fallback' });
         }
-        return res.json({ reply: `[MOTHER AI] AI key error: ${err.message}. Set a valid GEMINI_API_KEY (starts with AIza) on Railway and Render.`, source: 'error-fallback' });
+        return res.json({ reply: `[MOTHER AI] AI key error: ${err.message}. Ensure GEMINI_API_KEY is set correctly on Railway and Render.`, source: 'error-fallback' });
     }
 });
 

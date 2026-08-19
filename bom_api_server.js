@@ -35,8 +35,8 @@ let geminiModel = null;
 if (GoogleGenerativeAI && GEMINI_API_KEY) {
     try {
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        console.log('[AI] Mother AI brain initialized — model: gemini-2.0-flash');
+        geminiModel = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+        console.log('[AI] Mother AI brain initialized — model: gemini-3.6-flash');
     } catch (err) {
         console.warn('[AI] Gemini initialization failed:', err.message);
     }

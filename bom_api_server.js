@@ -40,6 +40,9 @@ if (GoogleGenerativeAI && GEMINI_API_KEY) {
     } catch (err) {
         console.warn('[AI] Gemini initialization failed:', err.message);
     }
+} else if (GEMINI_API_KEY && !GEMINI_API_KEY.startsWith('AIza')) {
+    console.warn('[AI] GEMINI_API_KEY format invalid — must start with AIza. Get key at aistudio.google.com');
+    geminiModel = null;
 } else {
     console.warn('[AI] GEMINI_API_KEY not set — /api/chat will use DB-only fallback');
 }
@@ -193,6 +196,9 @@ app.get('/api/search', (req, res) => {
     }
 });
 
+// ── API: PING / KEEP-ALIVE ───────────────────────────────
+app.get('/api/ping', (_req, res) => res.json({ ok: true, t: Date.now() }));
+
 // ── API: INTERNAL SWARM SYNC ─────────────────────────────────
 // Peer nodes call this to copy our database. Protected by SWARM_SECRET.
 app.get('/internal/sync', (req, res) => {
@@ -275,12 +281,16 @@ RULES:
         return res.json({ reply, source: 'gemini', indexedNames: db.length });
     } catch (err) {
         console.error('[AI] Chat error:', err.message);
-        // Graceful fallback on API error
-        return res.json({
-            reply:  '[MOTHER AI] AI engine temporarily unavailable. Please try again shortly.',
-            source: 'error-fallback',
-            error:  err.message,
-        });
+        const q2 = message.toLowerCase();
+        const match = db.find(r => q2.includes((r.namespace || '').toLowerCase()) && (r.namespace || '').length > 1);
+        if (match) {
+            return res.json({ reply: `[ ${match.namespace.toUpperCase()} ] Owner: ${match.owner}. URI: ${match.spatialURI || match.uri || 'not set'}. Status: ${match.status}.`, source: 'db-fallback' });
+        }
+        if (q2.includes('show all') || q2.includes('list') || q2.includes('all names')) {
+            const names = db.slice(0, 20).map(r => r.namespace.toUpperCase()).join(', ');
+            return res.json({ reply: `Indexed FNS names (${db.length} total): ${names || 'none yet'}.`, source: 'db-fallback' });
+        }
+        return res.json({ reply: `[MOTHER AI] AI key error: ${err.message}. Set a valid GEMINI_API_KEY (starts with AIza) on Railway and Render.`, source: 'error-fallback' });
     }
 });
 

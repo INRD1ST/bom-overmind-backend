@@ -40,9 +40,6 @@ if (GoogleGenerativeAI && GEMINI_API_KEY) {
     } catch (err) {
         console.warn('[AI] Gemini initialization failed:', err.message);
     }
-} else if (GEMINI_API_KEY && !GEMINI_API_KEY.startsWith('AIza')) {
-    console.warn('[AI] GEMINI_API_KEY format invalid — must start with AIza. Get key at aistudio.google.com');
-    geminiModel = null;
 } else {
     console.warn('[AI] GEMINI_API_KEY not set — /api/chat will use DB-only fallback');
 }

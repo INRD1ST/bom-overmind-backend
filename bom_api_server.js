@@ -211,7 +211,7 @@ ${cachedFnsIndex}
             });
         }
 
-        return res.json({ reply: `[SYSTEM ERROR]: Neural Link Severed.` });
+        return res.json({ reply: `[SYSTEM ERROR]: Neural Link Severed. | REASON: ${err.message}` });
     }
 });
 // ── WEB3 WATCHER (INDEXER WITH BLOCK CHUNKING) ───────────────

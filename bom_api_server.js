@@ -53,6 +53,10 @@ try {
 } catch (err) {
     console.warn('[AI] Gemini initialization failed:', err.message);
 }
+const CONTRACT_ABI = [
+    'event FNSRegistered(string targetString, address owner, string spatialURI)',
+    'event SpatialURIUpdated(string targetString, string newSpatialURI)',
+];
 
 // ── IPFS DEEP FETCHER ────────────────────────────────────────
 async function fetchIPFSMetadata(uri) {

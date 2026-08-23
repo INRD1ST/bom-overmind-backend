@@ -43,8 +43,8 @@ try {
         console.warn('[AI] WARNING: GEMINI_API_KEY is missing. Mother AI will be offline.');
     } else {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        geminiModel = genAI.getGenerativeModel({ model: "gemini-3.7-flash" });
-        console.log('[AI] Mother AI brain initialized — model: gemini-3.7-flash');
+        geminiModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash lite" });
+        console.log('[AI] Mother AI brain initialized — model: gemini-3.5-flash lite');
     }
 } catch (err) {
     console.warn('[AI] Gemini initialization failed:', err.message);

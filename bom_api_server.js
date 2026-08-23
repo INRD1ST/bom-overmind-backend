@@ -36,16 +36,19 @@ const MAX_BLOCK_CHUNK  = 2000;
 const GENESIS_BLOCK    = parseInt(process.env.GENESIS_BLOCK || '11251790');
 
 // ── GEMINI AI SETUP ──────────────────────────────────────────
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 let geminiModel = null;
-if (GoogleGenerativeAI && GEMINI_API_KEY) {
-    try {
-        const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        geminiModel = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' }); // Upgraded Model
-        console.log('[AI] Mother AI brain initialized — model: gemini-3.6-flash');
-    } catch (err) {
-        console.warn('[AI] Gemini initialization failed:', err.message);
+
+try {
+    if (!process.env.GEMINI_API_KEY) {
+        console.warn('[AI] WARNING: GEMINI_API_KEY is missing. Mother AI will be offline.');
+    } else {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        geminiModel = genAI.getGenerativeModel({ model: "gemini-3.7-flash" });
+        console.log('[AI] Mother AI brain initialized — model: gemini-3.7-flash');
     }
+} catch (err) {
+    console.warn('[AI] Gemini initialization failed:', err.message);
 }
 
 const CONTRACT_ABI = [

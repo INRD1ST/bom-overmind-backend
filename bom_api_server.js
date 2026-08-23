@@ -12,7 +12,14 @@ const ethersPkg = require('ethers');
 // 🔥 FIRESTORE ADMIN SETUP
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
-const serviceAccount = require('./firebase-key.json'); // Your secret key
+
+// Cloud fallback: Read from Railway Variable OR Local File
+let serviceAccount;
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+    serviceAccount = require('./firebase-key.json');
+}
 
 initializeApp({
   credential: cert(serviceAccount)

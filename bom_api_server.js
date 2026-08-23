@@ -139,7 +139,7 @@ app.post('/api/chat', async (req, res) => {
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
     // 1. Identify the User
-    const CHIEF_WALLET = "YOUR_WALLET_ADDRESS_HERE".toLowerCase(); 
+    const CHIEF_WALLET = "0xDC8727aE98692AA24375336a782b99E5580b7a49".toLowerCase(); 
     const isChiefArchitect = (wallet || "").toLowerCase() === CHIEF_WALLET;
 
     try {

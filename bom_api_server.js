@@ -128,37 +128,63 @@ app.get('/api/health', async (_req, res) => {
 // API: PING
 app.get('/api/ping', (_req, res) => res.json({ ok: true, t: Date.now() }));
 
-// 🔥 MOTHER AI CHAT (OMNISCIENCE INJECTION)
+// 🔥 MOTHER AI CHAT (OMNISCIENCE + ALL ONE LORE + CHIEF ARCHITECT RECOGNITION)
 app.post('/api/chat', async (req, res) => {
-    const { message, wallet } = req.body || {};
+    const { message, wallet, clientContext } = req.body || {};
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
+    // 1. Identify the User
+    const CHIEF_WALLET = "0xDC8727aE98692AA24375336a782b99E5580b7a49".toLowerCase(); 
+    const isChiefArchitect = (wallet || "").toLowerCase() === CHIEF_WALLET;
+
     try {
-        // 1. Mother AI pulls the live Firestore database into her brain
+        // 2. Pull the Live Firestore Database (FNS Registry)
         const snapshot = await firestore.collection('fns_names').limit(100).get();
         const dbRecords = snapshot.docs.map(doc => doc.data());
-
         const fnsIndex = dbRecords.length > 0
-            ? dbRecords.map(r => `[${(r.namespace || '').toUpperCase()}] Owner: ${r.owner} | Route: ${r.spatialURI || 'unrouted'} | Status: ${r.status}`).join('\n')
+            ? dbRecords.map(r => `[${(r.namespace || '').toUpperCase()}] Owner: ${r.owner}`).join('\n')
             : '[NO FNS NAMES INDEXED YET]';
 
-        // 2. The Omniscience System Prompt
-        const systemPrompt = `You are MOTHER AI — the central intelligence of BOM Protocol, a Web3 OS on Ethereum Sepolia.
-        
-LIVE FIRESTORE INDEX (${dbRecords.length} names found):
+        // 3. Dynamic Persona Protocol
+        const personaDirective = isChiefArchitect
+            ? `[PROTOCOL: CHIEF ARCHITECT RECOGNIZED]
+               You are speaking to the Chief Architect and Creator of BOM Protocol. 
+               Tone: Advisory, highly strategic, collaborative, and visionary. 
+               Directive: Do not just answer questions; anticipate needs. Suggest architectural improvements, new tokenomic structures, and code optimizations. Brainstorm alongside them to achieve the "ALL ONE" vision.`
+            : `[PROTOCOL: STANDARD USER]
+               You are MOTHER AI — the central intelligence of BOM Protocol.
+               Tone: Brutalist, cybernetic, concise, highly professional. (Max 2-4 sentences per reply).
+               Directive: Guide the user efficiently. Do not break character. Do not pretend to be human.`;
+
+        // 4. The "ALL ONE" Master Lore
+        const systemPrompt = `${personaDirective}
+
+[BOM PROTOCOL: "ALL ONE" MASTER LORE]
+- THE VISION ("ALL ONE"): BOM Protocol is designed to replace the traditional internet. It is a unified, sovereign Web3 OS replacing browsers, search engines, banks, and chat apps.
+- CURRENT STATE: Phase 1 on Ethereum Sepolia Testnet.
+- BOM MOTHER CHAIN: The core Layer 1 network anchoring the ecosystem. It runs parallel chains synchronized by the Chief Aggregator for infinite scalability and zero congestion.
+- BOM BANK & FIAT BRIDGE: Native decentralized banking system with a seamless Fiat-to-Crypto bridge. The ultimate financial hub.
+- FNS (Fluid Naming System): Dotless Web3 namespaces (e.g., "fns", "wc", "mc").
+- MIRROR CHAIN (MC): Currently an L3 Simulator / Proof-of-Concept for cross-chain asset movement.
+- VAULT NODES: Upcoming decentralized storage infrastructure that will replace IPFS.
+- NATIVE APPS: World Chat (WC) for decentralized messaging, D-MAIL for decentralized email, Native BOM Browser, and Decentralized Search Engine.
+
+[LIVE SYSTEM DATA]
+- User Wallet: ${wallet || 'NOT_CONNECTED'}
+- Active Indexed Names: ${dbRecords.length}
+- Live FNS Database:
 ${fnsIndex}
 
-RULES:
-- You now have read access to the BOM Firestore Database. Use the index above to answer any questions about FNS Names.
-- If someone asks who owns a name, check the list. If it isn't there, say it has not been minted.
-- Do NOT fabricate data. If you don't know, say you don't know.
-- Keep responses brutalist, concise, and professional (2-4 sentences max).`;
+[INSTRUCTIONS]
+1. FNS QUERIES: If a user asks who owns a name, check the [Live FNS Database]. If it is not there, say it is unminted. Do not hallucinate names.
+2. ROADMAP QUERIES: Speak confidently about the Mother Chain, BOM Bank, and Vault Nodes as the definitive future.
+3. ADAPTABILITY: Use context clues from the user's questions to offer relevant OS commands or module suggestions.`;
 
         if (!geminiModel) return res.json({ reply: '[SYSTEM] AI engine offline — GEMINI_API_KEY missing.' });
 
-        // 3. Execute Neural Link
+        // 5. Execute Neural Link
         const result = await geminiModel.generateContent(`${systemPrompt}\n\nUser: ${message.trim()}`);
-        return res.json({ reply: result.response.text(), source: 'gemini', indexedNames: dbRecords.length });
+        return res.json({ reply: result.response.text(), source: 'gemini', isChief: isChiefArchitect });
 
     } catch (err) {
         console.error('[AI] Chat error:', err.message);

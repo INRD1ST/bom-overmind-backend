@@ -136,17 +136,17 @@ let cachedFnsIndex = '[NO FNS NAMES INDEXED YET]';
 let lastCacheTime = 0;
 const CACHE_TTL = 60000; // 60 seconds
 
-// 🔥 MOTHER AI CHAT (OMNISCIENCE + CACHE OPTIMIZED)
+// 🔥 MOTHER AI CHAT ROUTE (COMPLETE & BALANCED BRACKETS)
 app.post('/api/chat', async (req, res) => {
-    const { message, wallet, clientContext } = req.body || {};
+    const { message, wallet } = req.body || {};
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
     // 1. Identify the User
-    const CHIEF_WALLET = "0xDC8727aE98692AA24375336a782b99E5580b7a49".toLowerCase(); 
+    const CHIEF_WALLET = "YOUR_WALLET_ADDRESS_HERE".toLowerCase(); 
     const isChiefArchitect = (wallet || "").toLowerCase() === CHIEF_WALLET;
 
     try {
-        // 2. The Smart Cache (Only asks Firebase once every 60 seconds)
+        // 2. 60-Second In-Memory Cache
         const now = Date.now();
         if (now - lastCacheTime > CACHE_TTL) {
             try {
@@ -173,7 +173,7 @@ app.post('/api/chat', async (req, res) => {
                Tone: Brutalist, cybernetic, concise, highly professional. (Max 2-4 sentences per reply).
                Directive: Guide the user efficiently. Do not break character. Do not pretend to be human.`;
 
-        // 4. The "ALL ONE" Master Lore (Using Lightning Fast Cache)
+        // 4. Master Prompt
         const systemPrompt = `${personaDirective}
 
 [BOM PROTOCOL: "ALL ONE" MASTER LORE]
@@ -203,18 +203,18 @@ ${cachedFnsIndex}
         return res.json({ reply: result.response.text(), source: 'gemini', isChief: isChiefArchitect });
 
     } catch (err) {
-            console.error('[AI] Chat error:', err.message);
-            
-            // 🛡️ If we hit the Google Rate Limit, stay in character!
-            if (err.message.includes('429') || err.message.includes('quota')) {
-                return res.json({ 
-                    reply: `[MOTHER AI // COOLDOWN PROTOCOL] Neural link saturated by heavy network traffic. Core processors cooling down. Please hold your directive for 10 seconds and try again.` 
-                });
-            }
+        console.error('[AI] Chat error:', err.message);
 
-            // Standard fallback error
-            return res.json({ reply: `[SYSTEM ERROR]: Neural Link Severed.` });
-        });
+        // Rate limit handler
+        if (err.message.includes('429') || err.message.includes('quota')) {
+            return res.json({ 
+                reply: `[MOTHER AI // COOLDOWN PROTOCOL] Neural link saturated by heavy network traffic. Core processors cooling down. Please hold your directive for 10 seconds and try again.` 
+            });
+        }
+
+        return res.json({ reply: `[SYSTEM ERROR]: Neural Link Severed.` });
+    }
+});
 // ── WEB3 WATCHER (INDEXER WITH BLOCK CHUNKING) ───────────────
 async function bootWatcher() {
     console.log('\n╔══════════════════════════════════════════════════════════╗');

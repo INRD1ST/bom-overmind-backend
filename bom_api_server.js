@@ -43,17 +43,16 @@ try {
         console.warn('[AI] WARNING: GEMINI_API_KEY is missing. Mother AI will be offline.');
     } else {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        geminiModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash lite" });
-        console.log('[AI] Mother AI brain initialized — model: gemini-3.5-flash lite');
+        
+        // 🔥 FUTURE-PROOF ENGINE: Reads from your server variables, defaults to 'antigravity'
+        const activeModel = process.env.GEMINI_MODEL || "antigravity";
+        
+        geminiModel = genAI.getGenerativeModel({ model: activeModel });
+        console.log(`[AI] Mother AI brain initialized — model: ${activeModel}`);
     }
 } catch (err) {
     console.warn('[AI] Gemini initialization failed:', err.message);
 }
-
-const CONTRACT_ABI = [
-    'event FNSRegistered(string targetString, address owner, string spatialURI)',
-    'event SpatialURIUpdated(string targetString, string newSpatialURI)',
-];
 
 // ── IPFS DEEP FETCHER ────────────────────────────────────────
 async function fetchIPFSMetadata(uri) {

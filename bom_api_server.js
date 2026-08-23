@@ -128,22 +128,36 @@ app.get('/api/health', async (_req, res) => {
 // API: PING
 app.get('/api/ping', (_req, res) => res.json({ ok: true, t: Date.now() }));
 
-// 🔥 MOTHER AI CHAT (OMNISCIENCE + ALL ONE LORE + CHIEF ARCHITECT RECOGNITION)
+// 🔥 CACHE VARIABLES (Stores data in server RAM for 60 seconds)
+let cachedFnsIndex = '[NO FNS NAMES INDEXED YET]';
+let lastCacheTime = 0;
+const CACHE_TTL = 60000; // 60 seconds
+
+// 🔥 MOTHER AI CHAT (OMNISCIENCE + CACHE OPTIMIZED)
 app.post('/api/chat', async (req, res) => {
     const { message, wallet, clientContext } = req.body || {};
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
     // 1. Identify the User
-    const CHIEF_WALLET = "0xDC8727aE98692AA24375336a782b99E5580b7a49".toLowerCase(); 
+    const CHIEF_WALLET = "YOUR_WALLET_ADDRESS_HERE".toLowerCase(); 
     const isChiefArchitect = (wallet || "").toLowerCase() === CHIEF_WALLET;
 
     try {
-        // 2. Pull the Live Firestore Database (FNS Registry)
-        const snapshot = await firestore.collection('fns_names').limit(100).get();
-        const dbRecords = snapshot.docs.map(doc => doc.data());
-        const fnsIndex = dbRecords.length > 0
-            ? dbRecords.map(r => `[${(r.namespace || '').toUpperCase()}] Owner: ${r.owner}`).join('\n')
-            : '[NO FNS NAMES INDEXED YET]';
+        // 2. The Smart Cache (Only asks Firebase once every 60 seconds)
+        const now = Date.now();
+        if (now - lastCacheTime > CACHE_TTL) {
+            try {
+                const snapshot = await firestore.collection('fns_names').limit(100).get();
+                const dbRecords = snapshot.docs.map(doc => doc.data());
+                cachedFnsIndex = dbRecords.length > 0
+                    ? dbRecords.map(r => `[${(r.namespace || '').toUpperCase()}] Owner: ${r.owner}`).join('\n')
+                    : '[NO FNS NAMES INDEXED YET]';
+                lastCacheTime = now;
+                console.log("[AI] FNS Database Cache Synced!");
+            } catch (dbErr) {
+                console.error("[AI] Failed to update cache. Using previous memory.", dbErr);
+            }
+        }
 
         // 3. Dynamic Persona Protocol
         const personaDirective = isChiefArchitect
@@ -156,7 +170,7 @@ app.post('/api/chat', async (req, res) => {
                Tone: Brutalist, cybernetic, concise, highly professional. (Max 2-4 sentences per reply).
                Directive: Guide the user efficiently. Do not break character. Do not pretend to be human.`;
 
-        // 4. The "ALL ONE" Master Lore
+        // 4. The "ALL ONE" Master Lore (Using Lightning Fast Cache)
         const systemPrompt = `${personaDirective}
 
 [BOM PROTOCOL: "ALL ONE" MASTER LORE]
@@ -167,18 +181,17 @@ app.post('/api/chat', async (req, res) => {
 - FNS (Fluid Naming System): Dotless Web3 namespaces (e.g., "fns", "wc", "mc").
 - MIRROR CHAIN (MC): Currently an L3 Simulator / Proof-of-Concept for cross-chain asset movement.
 - VAULT NODES: Upcoming decentralized storage infrastructure that will replace IPFS.
-- NATIVE APPS: World Chat (WC) for decentralized messaging, D-MAIL for decentralized email, Native BOM Browser, and Decentralized Search Engine.
+- NATIVE APPS: World Chat (WC), D-MAIL (Decentralized Email), Native BOM Browser, and Decentralized Search Engine.
 
 [LIVE SYSTEM DATA]
 - User Wallet: ${wallet || 'NOT_CONNECTED'}
-- Active Indexed Names: ${dbRecords.length}
-- Live FNS Database:
-${fnsIndex}
+- Live FNS Database (Cached):
+${cachedFnsIndex}
 
 [INSTRUCTIONS]
 1. FNS QUERIES: If a user asks who owns a name, check the [Live FNS Database]. If it is not there, say it is unminted. Do not hallucinate names.
 2. ROADMAP QUERIES: Speak confidently about the Mother Chain, BOM Bank, and Vault Nodes as the definitive future.
-3. ADAPTABILITY: Use context clues from the user's questions to offer relevant OS commands or module suggestions.`;
+3. ADAPTABILITY: Use context clues to offer relevant OS commands or module suggestions.`;
 
         if (!geminiModel) return res.json({ reply: '[SYSTEM] AI engine offline — GEMINI_API_KEY missing.' });
 

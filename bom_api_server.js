@@ -200,11 +200,18 @@ ${cachedFnsIndex}
         return res.json({ reply: result.response.text(), source: 'gemini', isChief: isChiefArchitect });
 
     } catch (err) {
-        console.error('[AI] Chat error:', err.message);
-        return res.json({ reply: `[MOTHER AI ERROR]: ${err.message}` });
-    }
-});
+            console.error('[AI] Chat error:', err.message);
+            
+            // 🛡️ If we hit the Google Rate Limit, stay in character!
+            if (err.message.includes('429') || err.message.includes('quota')) {
+                return res.json({ 
+                    reply: `[MOTHER AI // COOLDOWN PROTOCOL] Neural link saturated by heavy network traffic. Core processors cooling down. Please hold your directive for 10 seconds and try again.` 
+                });
+            }
 
+            // Standard fallback error
+            return res.json({ reply: `[SYSTEM ERROR]: Neural Link Severed.` });
+        }
 // ── WEB3 WATCHER (INDEXER WITH BLOCK CHUNKING) ───────────────
 async function bootWatcher() {
     console.log('\n╔══════════════════════════════════════════════════════════╗');

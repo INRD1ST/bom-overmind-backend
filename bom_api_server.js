@@ -36,6 +36,7 @@ const MAX_BLOCK_CHUNK  = 2000;
 const GENESIS_BLOCK    = parseInt(process.env.GENESIS_BLOCK || '11251790');
 
 // ── GEMINI AI SETUP ──────────────────────────────────────────
+// ── GEMINI AI SETUP ──────────────────────────────────────────
 let geminiModel = null;
 
 try {
@@ -43,16 +44,15 @@ try {
         console.warn('[AI] WARNING: GEMINI_API_KEY is missing. Mother AI will be offline.');
     } else {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        
-        // 🔥 FUTURE-PROOF ENGINE: Reads from your server variables, defaults to 'antigravity'
-        const activeModel = process.env.GEMINI_MODEL || "antigravity";
-        
-        geminiModel = genAI.getGenerativeModel({ model: activeModel });
-        console.log(`[AI] Mother AI brain initialized — model: ${activeModel}`);
+        // 🔥 FIXED: Replaced the space with a hyphen for the correct API endpoint
+        geminiModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
+        console.log('[AI] Mother AI brain initialized — model: gemini-3.5-flash-lite');
     }
 } catch (err) {
     console.warn('[AI] Gemini initialization failed:', err.message);
 }
+
+// 🔥 ABI RESTORED: Web3 Watcher is cleared to boot
 const CONTRACT_ABI = [
     'event FNSRegistered(string targetString, address owner, string spatialURI)',
     'event SpatialURIUpdated(string targetString, string newSpatialURI)',

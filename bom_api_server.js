@@ -36,7 +36,6 @@ const MAX_BLOCK_CHUNK  = 2000;
 const GENESIS_BLOCK    = parseInt(process.env.GENESIS_BLOCK || '11251790');
 
 // ── GEMINI AI SETUP ──────────────────────────────────────────
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 let geminiModel = null;
 
 try {

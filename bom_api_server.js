@@ -166,7 +166,7 @@ RULES:
     }
 });
 
-// ── WEB3 WATCHER (INDEXER) ───────────────────────────────────
+// ── WEB3 WATCHER (INDEXER WITH BLOCK CHUNKING) ───────────────
 async function bootWatcher() {
     console.log('\n╔══════════════════════════════════════════════════════════╗');
     console.log('║   BOM PROTOCOL — MOTHER AI v2.0  SWARM NODE (FIRESTORE)  ║');
@@ -180,14 +180,20 @@ async function bootWatcher() {
         if (parsed.name === 'FNSRegistered') {
             const ns = parsed.args[0].trim();
             const owner = parsed.args[1];
-            const uri = parsed.args[2].trim();
-            console.log(`\n[MINT DETECTED] "${ns}" | Block: #${blockNumber}`);
+            const uri = (parsed.args[2] || '').trim();
+            const isRouted = uri.length > 0;
+
+            console.log(`[MINT DETECTED] "${ns}" | Routed: ${isRouted} | Block: #${blockNumber}`);
             
             const meta = await fetchIPFSMetadata(uri);
             await upsert({
-                namespace: ns, owner, uri, spatialURI: uri,
-                status: uri.length > 0 ? 'routed' : 'unrouted',
-                ...meta, blockNumber,
+                namespace: ns,
+                owner,
+                uri,
+                spatialURI: uri,
+                status: isRouted ? 'routed' : 'unrouted',
+                ...meta,
+                blockNumber,
                 registeredAt: new Date().toISOString()
             });
         }
@@ -198,30 +204,54 @@ async function bootWatcher() {
             const currentBlock = await provider.getBlockNumber();
             if (currentBlock <= lastBlock) return;
 
-            const logs = await provider.getLogs({
-                address: CONTRACT_ADDRESS,
-                fromBlock: lastBlock + 1,
-                toBlock: currentBlock
-            });
+            let fromBlock = lastBlock + 1;
 
-            for (const log of logs) {
+            // ⚡ Chunking: Query in batches of 2000 blocks so RPC doesn't reject us
+            while (fromBlock <= currentBlock) {
+                const toBlock = Math.min(fromBlock + MAX_BLOCK_CHUNK - 1, currentBlock);
+
                 try {
-                    const parsed = iface.parseLog({ topics: log.topics, data: log.data });
-                    if (parsed) await handleLog(parsed, log.blockNumber);
-                } catch {}
+                    const logs = await provider.getLogs({
+                        address: CONTRACT_ADDRESS,
+                        fromBlock,
+                        toBlock
+                    });
+
+                    for (const log of logs) {
+                        try {
+                            const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+                            if (parsed) await handleLog(parsed, log.blockNumber);
+                        } catch (_) {}
+                    }
+                } catch (rpcErr) {
+                    console.error(`[POLL ERROR] Block range ${fromBlock}-${toBlock}:`, rpcErr.message);
+                    break; // Stop and retry next cycle
+                }
+
+                lastBlock = toBlock;
+                fromBlock = toBlock + 1;
             }
-            lastBlock = currentBlock;
-        } catch (err) {}
+        } catch (err) {
+            console.error('[POLL] Critical loop error:', err.message);
+        }
     }
 
     async function connect() {
         try {
             provider = new ethersPkg.JsonRpcProvider(RPC_URL);
-            await provider.getNetwork();
+            const net = await provider.getNetwork();
+            const currentBlock = await provider.getBlockNumber();
+            console.log(`[INDEXER] Connected to Sepolia (Chain ID: ${net.chainId}) | Current Block: #${currentBlock}`);
+            console.log(`[INDEXER] Starting Genesis Scan from block #${GENESIS_BLOCK}...`);
+
             setInterval(poll, POLL_INTERVAL);
-            await poll();
-        } catch (err) { setTimeout(connect, 15000); }
+            await poll(); // Trigger Genesis sweep immediately
+        } catch (err) {
+            console.error(`[INDEXER] RPC Connection failed: ${err.message}. Retrying in 15s...`);
+            setTimeout(connect, 15000);
+        }
     }
+
     await connect();
 }
 

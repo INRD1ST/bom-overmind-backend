@@ -211,7 +211,7 @@ ${cachedFnsIndex}
 
             // Standard fallback error
             return res.json({ reply: `[SYSTEM ERROR]: Neural Link Severed.` });
-        }
+        });
 // ── WEB3 WATCHER (INDEXER WITH BLOCK CHUNKING) ───────────────
 async function bootWatcher() {
     console.log('\n╔══════════════════════════════════════════════════════════╗');

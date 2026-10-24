@@ -153,7 +153,7 @@ app.post('/api/chat', async (req, res) => {
 
         // 5. Execute Sovereign Neural Link (Local Docker Ollama)
         console.log(`[AI] Routing directive to local Qwen engine for ${wallet || 'Anon'}...`);
-        const ollamaResponse = await fetch('http://localhost:11434/api/chat', {
+        const ollamaResponse = await fetch('http://127.0.0.1:11434/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

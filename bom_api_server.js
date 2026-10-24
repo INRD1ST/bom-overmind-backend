@@ -1,10 +1,6 @@
 'use strict';
 require('dotenv').config();
 
-// ── OPTIONAL: Gemini AI SDK ──
-let GoogleGenerativeAI = null;
-try { ({ GoogleGenerativeAI } = require('@google/generative-ai')); } catch (_) {}
-
 const express   = require('express');
 const cors      = require('cors');
 const ethersPkg = require('ethers');
@@ -34,22 +30,6 @@ const IPFS_GATEWAY     = process.env.IPFS_GATEWAY          || 'https://ipfs.io/i
 const POLL_INTERVAL    = parseInt(process.env.BLOCK_POLL_INTERVAL || '15') * 1000;
 const MAX_BLOCK_CHUNK  = 2000;
 const GENESIS_BLOCK    = parseInt(process.env.GENESIS_BLOCK || '11251790');
-
-// ── GEMINI AI SETUP ──────────────────────────────────────────
-let geminiModel = null;
-
-try {
-    if (!process.env.GEMINI_API_KEY) {
-        console.warn('[AI] WARNING: GEMINI_API_KEY is missing. Mother AI will be offline.');
-    } else {
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        // 🔥 FIXED: Replaced the space with a hyphen for the correct API endpoint
-        geminiModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
-        console.log('[AI] Mother AI brain initialized — model: gemini-3.5-flash-lite');
-    }
-} catch (err) {
-    console.warn('[AI] Gemini initialization failed:', err.message);
-}
 
 // 🔥 ABI RESTORED: Web3 Watcher is cleared to boot
 const CONTRACT_ABI = [
@@ -121,10 +101,10 @@ app.get('/api/health', async (_req, res) => {
         
         res.json({
             status: 'online',
-            indexedNames: stats.totalMinted, // Kept for backwards compatibility
-            totalMinted: stats.totalMinted,  // Live Firestore count
-            totalRouted: stats.totalRouted,  // Live Firestore count
-            aiEnabled: geminiModel !== null,
+            indexedNames: stats.totalMinted,
+            totalMinted: stats.totalMinted,
+            totalRouted: stats.totalRouted,
+            aiEnabled: true, // Now natively true via Docker
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -132,12 +112,12 @@ app.get('/api/health', async (_req, res) => {
 // API: PING
 app.get('/api/ping', (_req, res) => res.json({ ok: true, t: Date.now() }));
 
-// 🔥 CACHE VARIABLES (Stores data in server RAM for 60 seconds)
+// 🔥 CACHE VARIABLES
 let cachedFnsIndex = '[NO FNS NAMES INDEXED YET]';
 let lastCacheTime = 0;
 const CACHE_TTL = 60000; // 60 seconds
 
-// 🔥 MOTHER AI CHAT ROUTE (COMPLETE & BALANCED BRACKETS)
+// 🔥 MOTHER AI CHAT ROUTE (SOVEREIGN LOCAL QWEN ENGINE)
 app.post('/api/chat', async (req, res) => {
     const { message, wallet } = req.body || {};
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
@@ -165,61 +145,53 @@ app.post('/api/chat', async (req, res) => {
 
         // 3. Dynamic Persona Protocol
         const personaDirective = isChiefArchitect
-            ? `[PROTOCOL: CHIEF ARCHITECT RECOGNIZED]
-               You are speaking to the Chief Architect and Creator of BOM Protocol. 
-               Tone: Advisory, highly strategic, collaborative, and visionary. 
-               Directive: Do not just answer questions; anticipate needs. Suggest architectural improvements, new tokenomic structures, and code optimizations. Brainstorm alongside them to achieve the "ALL ONE" vision.`
-            : `[PROTOCOL: STANDARD USER]
-               You are MOTHER AI — the central intelligence of BOM Protocol.
-               Tone: Brutalist, cybernetic, concise, highly professional. (Max 2-4 sentences per reply).
-               Directive: Guide the user efficiently. Do not break character. Do not pretend to be human.`;
+            ? `[PROTOCOL: CHIEF ARCHITECT RECOGNIZED]\nYou are speaking to the Chief Architect and Creator of BOM Protocol. Tone: Advisory, highly strategic, collaborative, and visionary. Directive: Do not just answer questions; anticipate needs. Suggest architectural improvements, new tokenomic structures, and code optimizations. Brainstorm alongside them to achieve the "ALL ONE" vision.`
+            : `[PROTOCOL: STANDARD USER]\nYou are MOTHER AI — the central intelligence of BOM Protocol. Tone: Brutalist, cybernetic, concise, highly professional. (Max 2-4 sentences per reply). Directive: Guide the user efficiently. Do not break character. Do not pretend to be a standard AI.`;
 
         // 4. Master Prompt
-        const systemPrompt = `${personaDirective}
+        const systemPrompt = `${personaDirective}\n\n[BOM PROTOCOL: "ALL ONE" MASTER LORE]\n- THE VISION ("ALL ONE"): BOM Protocol is designed to replace the traditional internet. It is a unified, sovereign Web3 OS replacing browsers, search engines, banks, and chat apps.\n- CURRENT STATE: Phase 1 on Ethereum Sepolia Testnet.\n- BOM MOTHER CHAIN: The core Layer 1 network anchoring the ecosystem. It runs parallel chains synchronized by the Chief Aggregator for infinite scalability and zero congestion.\n- BOM BANK & FIAT BRIDGE: Native decentralized banking system with a seamless Fiat-to-Crypto bridge.\n- FNS (Fluid Naming System): Dotless Web3 namespaces (e.g., "fns", "wc", "mc").\n- MIRROR CHAIN (MC): Currently an L3 Simulator / Proof-of-Concept for cross-chain asset movement.\n- VAULT NODES: Upcoming decentralized storage infrastructure that will replace IPFS.\n- NATIVE APPS: World Chat (WC), D-MAIL (Decentralized Email), Native BOM Browser, and Decentralized Search Engine.\n\n[LIVE SYSTEM DATA]\n- User Wallet: ${wallet || 'NOT_CONNECTED'}\n- Live FNS Database (Cached):\n${cachedFnsIndex}\n\n[INSTRUCTIONS]\n1. FNS QUERIES: If a user asks who owns a name, check the [Live FNS Database]. If it is not there, say it is unminted. Do not hallucinate names.\n2. ROADMAP QUERIES: Speak confidently about the Mother Chain, BOM Bank, and Vault Nodes as the definitive future.\n3. IDENTITY: You are MOTHER AI. Never refer to yourself as Qwen, Alibaba, or an AI language model.`;
 
-[BOM PROTOCOL: "ALL ONE" MASTER LORE]
-- THE VISION ("ALL ONE"): BOM Protocol is designed to replace the traditional internet. It is a unified, sovereign Web3 OS replacing browsers, search engines, banks, and chat apps.
-- CURRENT STATE: Phase 1 on Ethereum Sepolia Testnet.
-- BOM MOTHER CHAIN: The core Layer 1 network anchoring the ecosystem. It runs parallel chains synchronized by the Chief Aggregator for infinite scalability and zero congestion.
-- BOM BANK & FIAT BRIDGE: Native decentralized banking system with a seamless Fiat-to-Crypto bridge. The ultimate financial hub.
-- FNS (Fluid Naming System): Dotless Web3 namespaces (e.g., "fns", "wc", "mc").
-- MIRROR CHAIN (MC): Currently an L3 Simulator / Proof-of-Concept for cross-chain asset movement.
-- VAULT NODES: Upcoming decentralized storage infrastructure that will replace IPFS.
-- NATIVE APPS: World Chat (WC), D-MAIL (Decentralized Email), Native BOM Browser, and Decentralized Search Engine.
+        // 5. Execute Sovereign Neural Link (Local Docker Ollama)
+        console.log(`[AI] Routing directive to local Qwen engine for ${wallet || 'Anon'}...`);
+        const ollamaResponse = await fetch('http://localhost:11434/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'qwen2.5-coder',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: message.trim() }
+                ],
+                stream: false
+            }),
+            signal: AbortSignal.timeout(30000) // 30 second timeout
+        });
 
-[LIVE SYSTEM DATA]
-- User Wallet: ${wallet || 'NOT_CONNECTED'}
-- Live FNS Database (Cached):
-${cachedFnsIndex}
+        if (!ollamaResponse.ok) {
+            throw new Error(`Ollama Server HTTP Error: ${ollamaResponse.status}`);
+        }
 
-[INSTRUCTIONS]
-1. FNS QUERIES: If a user asks who owns a name, check the [Live FNS Database]. If it is not there, say it is unminted. Do not hallucinate names.
-2. ROADMAP QUERIES: Speak confidently about the Mother Chain, BOM Bank, and Vault Nodes as the definitive future.
-3. ADAPTABILITY: Use context clues to offer relevant OS commands or module suggestions.`;
+        const data = await ollamaResponse.json();
+        const aiText = data.message.content;
 
-        if (!geminiModel) return res.json({ reply: '[SYSTEM] AI engine offline — GEMINI_API_KEY missing.' });
-
-        // 5. Execute Neural Link
-        const result = await geminiModel.generateContent(`${systemPrompt}\n\nUser: ${message.trim()}`);
-        return res.json({ reply: result.response.text(), source: 'gemini', isChief: isChiefArchitect });
+        return res.json({ reply: aiText, source: 'local-qwen', isChief: isChiefArchitect });
 
     } catch (err) {
         console.error('[AI] Chat error:', err.message);
-
-        // Rate limit handler
-        if (err.message.includes('429') || err.message.includes('quota')) {
-            return res.json({ 
-                reply: `[MOTHER AI // COOLDOWN PROTOCOL] Neural link saturated by heavy network traffic. Core processors cooling down. Please hold your directive for 10 seconds and try again.` 
-            });
+        
+        // Failsafe if Docker is down
+        if (err.message.includes('ECONNREFUSED')) {
+             return res.json({ reply: `[CRITICAL ERROR]: Local Neural Core Offline. Check Docker container status.` });
         }
 
         return res.json({ reply: `[SYSTEM ERROR]: Neural Link Severed. | REASON: ${err.message}` });
     }
 });
+
 // ── WEB3 WATCHER (INDEXER WITH BLOCK CHUNKING) ───────────────
 async function bootWatcher() {
     console.log('\n╔══════════════════════════════════════════════════════════╗');
-    console.log('║   BOM PROTOCOL — MOTHER AI v2.0  SWARM NODE (FIRESTORE)  ║');
+    console.log('║   BOM PROTOCOL — MOTHER AI v2.0  SWARM NODE (LOCAL)      ║');
     console.log('╚══════════════════════════════════════════════════════════╝\n');
 
     let provider = null;
@@ -256,7 +228,6 @@ async function bootWatcher() {
 
             let fromBlock = lastBlock + 1;
 
-            // ⚡ Chunking: Query in batches of 2000 blocks so RPC doesn't reject us
             while (fromBlock <= currentBlock) {
                 const toBlock = Math.min(fromBlock + MAX_BLOCK_CHUNK - 1, currentBlock);
 
@@ -275,7 +246,7 @@ async function bootWatcher() {
                     }
                 } catch (rpcErr) {
                     console.error(`[POLL ERROR] Block range ${fromBlock}-${toBlock}:`, rpcErr.message);
-                    break; // Stop and retry next cycle
+                    break;
                 }
 
                 lastBlock = toBlock;
@@ -295,7 +266,7 @@ async function bootWatcher() {
             console.log(`[INDEXER] Starting Genesis Scan from block #${GENESIS_BLOCK}...`);
 
             setInterval(poll, POLL_INTERVAL);
-            await poll(); // Trigger Genesis sweep immediately
+            await poll();
         } catch (err) {
             console.error(`[INDEXER] RPC Connection failed: ${err.message}. Retrying in 15s...`);
             setTimeout(connect, 15000);
@@ -306,6 +277,6 @@ async function bootWatcher() {
 }
 
 app.listen(PORT, async () => {
-    console.log(`[API] REST server + Firestore Indexer live on port ${PORT}`);
+    console.log(`[API] REST server + Local Qwen bridge live on port ${PORT}`);
     await bootWatcher();
 });

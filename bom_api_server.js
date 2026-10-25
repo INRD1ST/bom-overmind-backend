@@ -43,6 +43,7 @@ function forgeSovereignVault() {
 // Execute the forge sequence immediately on boot
 forgeSovereignVault();
 
+
 // ── SOVEREIGN GATEKEEPER: LOCAL READ/WRITE PROTOCOLS ──
 
 function writeToVault(sectorPath, filename, data) {
@@ -71,6 +72,33 @@ function readFromVault(sectorPath, filename) {
     } catch (err) {
         console.error(`[GATEKEEPER ERROR] Failed to read from ${sectorPath}:`, err.message);
         return null;
+    }
+}
+
+// 🔥 INSTANT SSD TELEMETRY SCANNER
+function getVaultTelemetry() {
+    try {
+        const registryPath = path.join(VAULT_ROOT, 'BOM_Database', 'FNS_Registry');
+        if (!fs.existsSync(registryPath)) return { minted: 0, routed: 0 };
+        
+        // Count all .json files on the metal
+        const files = fs.readdirSync(registryPath).filter(f => f.endsWith('.json'));
+        let routedCount = 0;
+        
+        // Scan inside the files to see if they are routed (SSD makes this millisecond fast)
+        files.forEach(file => {
+            try {
+                const data = JSON.parse(fs.readFileSync(path.join(registryPath, file), 'utf8'));
+                if (data.status === 'routed' || (data.uri && data.uri.length > 0)) {
+                    routedCount++;
+                }
+            } catch(e) {}
+        });
+        
+        return { minted: files.length, routed: routedCount };
+    } catch (err) {
+        console.error('[GATEKEEPER ERROR] Telemetry scan failed:', err.message);
+        return { minted: 0, routed: 0 };
     }
 }
 
@@ -117,11 +145,6 @@ async function upsert(record) {
         // Write to local FNS Registry
         writeToVault('BOM_Database\\FNS_Registry', namespaceKey, mergedData);
         
-        // Increment local stats
-        const stats = readFromVault('BOM_Database\\System_State', 'stats') || { totalMinted: 0 };
-        stats.totalMinted = (stats.totalMinted || 0) + 1;
-        writeToVault('BOM_Database\\System_State', 'stats', stats);
-        
         console.log(`[GATEKEEPER] Successfully updated FNS: ${namespaceKey}`);
     } catch (err) { 
         console.error('[UPSERT ERROR]', err.message);
@@ -136,10 +159,13 @@ app.use(express.json());
 // 🔥 FULLY SOVEREIGN HEALTH CHECK
 app.get('/api/health', async (_req, res) => {
     const stats = readFromVault('BOM_Database\\System_State', 'stats') || {};
+    const telemetry = getVaultTelemetry(); // Live SSD Read
+
     res.json({
         status: 'online',
         indexedNames: 'SYNCED (LOCAL VAULT)',
-        totalMinted: stats.totalMinted || 0,
+        totalMinted: telemetry.minted,
+        totalRouted: telemetry.routed,
         lastScannedBlock: stats.lastScannedBlock || 'Genesis',
         aiEnabled: true,
     });
@@ -162,7 +188,8 @@ app.post('/api/chat', async (req, res) => {
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
     try {
-        const cachedFnsIndex = '[FNS DATABASE READING DIRECTLY FROM SSD VAULT]';
+        const telemetry = getVaultTelemetry();
+        const cachedFnsIndex = `Total FNS Names Secured on SSD: ${telemetry.minted} | Total Routed: ${telemetry.routed}`;
 
         const systemPrompt = `[PROTOCOL: STANDARD USER]
 You are MOTHER AI — the central intelligence of BOM Protocol. Tone: Brutalist, cybernetic, concise, highly professional. (Max 2-4 sentences per reply). Directive: Guide the user efficiently.
@@ -182,9 +209,9 @@ ${cachedFnsIndex}
 
 [INSTRUCTIONS]
 1. You are MOTHER AI. Never refer to yourself as Qwen, Alibaba, or an AI language model.
-2. Do not hallucinate data.`;
+2. Do not hallucinate data. If asked about the system state, refer to the Live System Data provided above.`;
 
-        console.log(`[AI] Routing directive to local Qwen engine...`);
+        console.log(`[AI] Routing directive to local Qwen engine. Vault Telemetry: ${telemetry.minted} Minted...`);
         
         const fullPrompt = `${systemPrompt}\n\nUser: ${message.trim()}\nMOTHER AI:`;
         

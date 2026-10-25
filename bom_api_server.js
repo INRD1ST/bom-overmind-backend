@@ -115,7 +115,7 @@ ${cachedFnsIndex}
         const fullPrompt = `${systemPrompt}\n\nUser: ${message.trim()}\nMOTHER AI:`;
         
         const response = await axios.post('http://127.0.0.1:11434/api/generate', {
-            model: 'qwen2.5-coder:latest',
+            model: 'qwen2.5-coder:7b',
             prompt: fullPrompt,
             stream: false
         }, { timeout: 120000 });

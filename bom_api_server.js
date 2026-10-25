@@ -82,7 +82,7 @@ app.get('/api/health', async (_req, res) => {
 app.get('/api/resolve/:namespace', async (req, res) => {
     return res.status(503).json({ error: 'FNS lookup temporarily disabled due to quota.' });
 });
-// 🔥 MOTHER AI CHAT ROUTE (Bulletproof Universal Endpoint)
+// 🔥 MOTHER AI CHAT ROUTE (Diagnostic Truth-Teller)
 app.post('/api/chat', async (req, res) => {
     const { message, wallet } = req.body || {};
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
@@ -112,21 +112,24 @@ ${cachedFnsIndex}
 
         console.log(`[AI] Routing directive to local Qwen engine...`);
         
-        // ⚡ Swapped to the universal /api/generate endpoint to bypass 404 routing errors
         const fullPrompt = `${systemPrompt}\n\nUser: ${message.trim()}\nMOTHER AI:`;
         
         const response = await axios.post('http://127.0.0.1:11434/api/generate', {
-            model: 'qwen2.5-coder', // 🔥 Removed :latest to let Docker auto-resolve
+            model: 'qwen2.5-coder:latest',
             prompt: fullPrompt,
             stream: false
         }, { timeout: 120000 });
 
-        // Generate endpoint uses 'response' instead of 'message.content'
         return res.json({ reply: response.data.response, source: 'local-qwen' });
 
     } catch (err) {
-        console.error('[AI] Chat error:', err.message);
-        return res.json({ reply: `[SYSTEM ERROR]: Neural Link Severed. | REASON: ${err.message}` });
+        // 🔥 RIP THE MASK OFF: Extract the exact error from Ollama instead of a generic 404
+        const trueError = err.response && err.response.data 
+            ? JSON.stringify(err.response.data) 
+            : err.message;
+            
+        console.error('[AI] Chat error:', trueError);
+        return res.json({ reply: `[SYSTEM ERROR]: Neural Link Severed. | REASON: ${trueError}` });
     }
 });
 

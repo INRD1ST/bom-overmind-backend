@@ -141,7 +141,7 @@ ${cachedFnsIndex}
         
         // ⚡ 120-second timeout for cold boots, hardcoded IP to bypass Node bug
         const response = await axios.post('http://127.0.0.1:11434/api/chat', {
-            model: 'qwen2.5-coder',
+            model: 'qwen2.5-coder:latest', // 🔥 ADDED :latest RIGHT HERE
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: message.trim() }

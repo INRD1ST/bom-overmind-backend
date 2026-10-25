@@ -15,6 +15,8 @@ const OS_DIRECTORIES = [
     'Mother_Brain\\Memory',          // AI chat history and user context
     'Mother_Brain\\Knowledge_Base',  // Scraped web data, lore, and RAG files
     'BOM_Database\\FNS_Registry',    // Replaces Firebase for dotless domains
+    'BOM_Database\\L3_Subnets',      // Mirror Chains
+    'BOM_Database\\System_State',    // Block indexer stats and system health
     'BOM_Database\\Swarm_Logs',      // P2P network telemetry
     'BOM_Database\\D_Mail',          // Encrypted decentralized mail
     'BOM_Database\\World_Chat',      // Global public message logs
@@ -41,19 +43,36 @@ function forgeSovereignVault() {
 // Execute the forge sequence immediately on boot
 forgeSovereignVault();
 
-// 🔥 FIRESTORE ADMIN SETUP
-const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+// ── SOVEREIGN GATEKEEPER: LOCAL READ/WRITE PROTOCOLS ──
 
-let serviceAccount;
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-} else {
-    serviceAccount = require('./firebase-key.json');
+function writeToVault(sectorPath, filename, data) {
+    try {
+        const cleanName = filename.trim().toLowerCase();
+        const filePath = path.join(VAULT_ROOT, sectorPath, `${cleanName}.json`);
+        
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 4));
+        return true;
+    } catch (err) {
+        console.error(`[GATEKEEPER ERROR] Failed to write to ${sectorPath}:`, err.message);
+        return false;
+    }
 }
 
-initializeApp({ credential: cert(serviceAccount) });
-const firestore = getFirestore();
+function readFromVault(sectorPath, filename) {
+    try {
+        const cleanName = filename.trim().toLowerCase();
+        const filePath = path.join(VAULT_ROOT, sectorPath, `${cleanName}.json`);
+        
+        if (fs.existsSync(filePath)) {
+            const fileContent = fs.readFileSync(filePath, 'utf8');
+            return JSON.parse(fileContent);
+        }
+        return null;
+    } catch (err) {
+        console.error(`[GATEKEEPER ERROR] Failed to read from ${sectorPath}:`, err.message);
+        return null;
+    }
+}
 
 // ── CONFIG ──────────────────────────────────────────────────
 const PORT             = process.env.PORT                  || 3000;
@@ -90,12 +109,23 @@ async function fetchIPFSMetadata(uri) {
 async function upsert(record) {
     try {
         const namespaceKey = record.namespace.toLowerCase();
-        await firestore.collection('fns_names').doc(namespaceKey).set(record, { merge: true });
         
-        await firestore.collection('system').doc('stats').set({
-            totalMinted: FieldValue.increment(1)
-        }, { merge: true });
-    } catch (err) { }
+        // Merge with existing record if it exists
+        const existingData = readFromVault('BOM_Database\\FNS_Registry', namespaceKey) || {};
+        const mergedData = { ...existingData, ...record };
+        
+        // Write to local FNS Registry
+        writeToVault('BOM_Database\\FNS_Registry', namespaceKey, mergedData);
+        
+        // Increment local stats
+        const stats = readFromVault('BOM_Database\\System_State', 'stats') || { totalMinted: 0 };
+        stats.totalMinted = (stats.totalMinted || 0) + 1;
+        writeToVault('BOM_Database\\System_State', 'stats', stats);
+        
+        console.log(`[GATEKEEPER] Successfully updated FNS: ${namespaceKey}`);
+    } catch (err) { 
+        console.error('[UPSERT ERROR]', err.message);
+    }
 }
 
 // ── EXPRESS API ──────────────────────────────────────────────
@@ -103,27 +133,36 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔥 QUOTA BYPASS: Hardcoded health check to prevent Firebase READ crashes
+// 🔥 FULLY SOVEREIGN HEALTH CHECK
 app.get('/api/health', async (_req, res) => {
+    const stats = readFromVault('BOM_Database\\System_State', 'stats') || {};
     res.json({
         status: 'online',
-        indexedNames: 'SYNCING (QUOTA OVERRIDE)',
-        totalMinted: 'SYNCING',
-        totalRouted: 'SYNCING',
+        indexedNames: 'SYNCED (LOCAL VAULT)',
+        totalMinted: stats.totalMinted || 0,
+        lastScannedBlock: stats.lastScannedBlock || 'Genesis',
         aiEnabled: true,
     });
 });
 
+// 🔥 MILLISECOND LOCAL VAULT READ
 app.get('/api/resolve/:namespace', async (req, res) => {
-    return res.status(503).json({ error: 'FNS lookup temporarily disabled due to quota.' });
+    const fnsData = readFromVault('BOM_Database\\FNS_Registry', req.params.namespace);
+    
+    if (fnsData) {
+        return res.json(fnsData);
+    } else {
+        return res.status(404).json({ error: 'FNS not found in local vault.' });
+    }
 });
+
 // 🔥 MOTHER AI CHAT ROUTE (Diagnostic Truth-Teller)
 app.post('/api/chat', async (req, res) => {
     const { message, wallet } = req.body || {};
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
     try {
-        const cachedFnsIndex = '[FNS DATABASE READS TEMPORARILY PAUSED: QUOTA RESET AT MIDNIGHT]';
+        const cachedFnsIndex = '[FNS DATABASE READING DIRECTLY FROM SSD VAULT]';
 
         const systemPrompt = `[PROTOCOL: STANDARD USER]
 You are MOTHER AI — the central intelligence of BOM Protocol. Tone: Brutalist, cybernetic, concise, highly professional. (Max 2-4 sentences per reply). Directive: Guide the user efficiently.
@@ -158,7 +197,6 @@ ${cachedFnsIndex}
         return res.json({ reply: response.data.response, source: 'local-qwen' });
 
     } catch (err) {
-        // 🔥 RIP THE MASK OFF: Extract the exact error from Ollama instead of a generic 404
         const trueError = err.response && err.response.data 
             ? JSON.stringify(err.response.data) 
             : err.message;
@@ -177,8 +215,9 @@ async function bootWatcher() {
     let provider = null;
     let iface = new ethersPkg.Interface(CONTRACT_ABI);
     
-    // 🔥 QUOTA BYPASS: Forcing the hardcoded Genesis block without reading from Firestore
-    let lastBlock = GENESIS_BLOCK - 1;
+    // Read the last scanned block from your F Drive memory
+    const stats = readFromVault('BOM_Database\\System_State', 'stats') || {};
+    let lastBlock = stats.lastScannedBlock || (GENESIS_BLOCK - 1);
 
     async function handleLog(parsed, blockNumber) {
         if (parsed.name === 'FNSRegistered') {
@@ -217,8 +256,10 @@ async function bootWatcher() {
                 lastBlock = toBlock;
                 fromBlock = toBlock + 1;
                 
-                // Writing memory doesn't burn reads
-                await firestore.collection('system').doc('stats').set({ lastScannedBlock: lastBlock }, { merge: true });
+                // Write block progress to local SSD instead of Firebase
+                const currentStats = readFromVault('BOM_Database\\System_State', 'stats') || {};
+                currentStats.lastScannedBlock = lastBlock;
+                writeToVault('BOM_Database\\System_State', 'stats', currentStats);
             }
         } catch (err) { }
     }
@@ -228,7 +269,7 @@ async function bootWatcher() {
             provider = new ethersPkg.JsonRpcProvider(RPC_URL);
             const currentBlock = await provider.getBlockNumber();
             console.log(`[INDEXER] Connected to Sepolia | Current Block: #${currentBlock}`);
-            console.log(`[INDEXER] Quota Bypass Active. Starting from block #${GENESIS_BLOCK}...`);
+            console.log(`[INDEXER] Vault Memory Active. Starting from block #${lastBlock + 1}...`);
 
             setInterval(poll, POLL_INTERVAL);
             await poll();

@@ -82,14 +82,12 @@ app.get('/api/health', async (_req, res) => {
 app.get('/api/resolve/:namespace', async (req, res) => {
     return res.status(503).json({ error: 'FNS lookup temporarily disabled due to quota.' });
 });
-
-// 🔥 MOTHER AI CHAT ROUTE
+// 🔥 MOTHER AI CHAT ROUTE (Bulletproof Universal Endpoint)
 app.post('/api/chat', async (req, res) => {
     const { message, wallet } = req.body || {};
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
     try {
-        // 🔥 QUOTA BYPASS: Disabled database read for cached names today.
         const cachedFnsIndex = '[FNS DATABASE READS TEMPORARILY PAUSED: QUOTA RESET AT MIDNIGHT]';
 
         const systemPrompt = `[PROTOCOL: STANDARD USER]
@@ -114,16 +112,17 @@ ${cachedFnsIndex}
 
         console.log(`[AI] Routing directive to local Qwen engine...`);
         
-        const response = await axios.post('http://127.0.0.1:11434/api/chat', {
-            model: 'qwen2.5-coder:latest',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: message.trim() }
-            ],
+        // ⚡ Swapped to the universal /api/generate endpoint to bypass 404 routing errors
+        const fullPrompt = `${systemPrompt}\n\nUser: ${message.trim()}\nMOTHER AI:`;
+        
+        const response = await axios.post('http://127.0.0.1:11434/api/generate', {
+            model: 'qwen2.5-coder', // 🔥 Removed :latest to let Docker auto-resolve
+            prompt: fullPrompt,
             stream: false
         }, { timeout: 120000 });
 
-        return res.json({ reply: response.data.message.content, source: 'local-qwen' });
+        // Generate endpoint uses 'response' instead of 'message.content'
+        return res.json({ reply: response.data.response, source: 'local-qwen' });
 
     } catch (err) {
         console.error('[AI] Chat error:', err.message);

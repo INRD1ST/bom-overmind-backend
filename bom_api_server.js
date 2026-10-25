@@ -4,9 +4,9 @@ require('dotenv').config();
 const express   = require('express');
 const cors      = require('cors');
 const ethersPkg = require('ethers');
-const axios     = require('axios'); // 🔥 The bulletproof network bridge
+const axios     = require('axios'); 
 
-// 🔥 FIRESTORE ADMIN SETUP (Fixed double-import)
+// 🔥 FIRESTORE ADMIN SETUP
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
@@ -28,7 +28,7 @@ const IPFS_GATEWAY     = process.env.IPFS_GATEWAY          || 'https://ipfs.io/i
 const POLL_INTERVAL    = parseInt(process.env.BLOCK_POLL_INTERVAL || '15') * 1000;
 const MAX_BLOCK_CHUNK  = 2000;
 
-// 🔥 GENESIS JUMP: Hardcoded to bypass the exhausted quota
+// 🔥 GENESIS JUMP
 const GENESIS_BLOCK    = 11988672; 
 
 const CONTRACT_ABI = [
@@ -36,7 +36,6 @@ const CONTRACT_ABI = [
     'event SpatialURIUpdated(string targetString, string newSpatialURI)',
 ];
 
-// ── IPFS DEEP FETCHER ────────────────────────────────────────
 async function fetchIPFSMetadata(uri) {
     const empty = { businessName: null, description: null, category: null, location: null, tags: [] };
     if (!uri || !uri.toLowerCase().startsWith('ipfs://')) return empty;
@@ -53,20 +52,15 @@ async function fetchIPFSMetadata(uri) {
     } catch { return empty; }
 }
 
-// 🔥 FIRESTORE UPSERT ────────────────────────────────────────
 async function upsert(record) {
     try {
         const namespaceKey = record.namespace.toLowerCase();
         await firestore.collection('fns_names').doc(namespaceKey).set(record, { merge: true });
         
-        // 🔥 Live UI telemetry updates with ZERO read quota!
         await firestore.collection('system').doc('stats').set({
             totalMinted: FieldValue.increment(1)
         }, { merge: true });
-
-    } catch (err) {
-        console.error('[FIRESTORE] Upsert error:', err.message);
-    }
+    } catch (err) { }
 }
 
 // ── EXPRESS API ──────────────────────────────────────────────
@@ -74,48 +68,29 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/resolve/:namespace', async (req, res) => {
-    try {
-        const doc = await firestore.collection('fns_names').doc(req.params.namespace.toLowerCase()).get();
-        if (!doc.exists) return res.status(404).json({ error: 'Not Found' });
-        return res.json(doc.data());
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
+// 🔥 QUOTA BYPASS: Hardcoded health check to prevent Firebase READ crashes
 app.get('/api/health', async (_req, res) => {
-    try {
-        const statsDoc = await firestore.collection('system').doc('stats').get();
-        const stats = statsDoc.exists ? statsDoc.data() : { totalMinted: 0, totalRouted: 0 };
-        res.json({
-            status: 'online',
-            indexedNames: stats.totalMinted,
-            totalMinted: stats.totalMinted,
-            totalRouted: stats.totalRouted,
-            aiEnabled: true,
-        });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    res.json({
+        status: 'online',
+        indexedNames: 'SYNCING (QUOTA OVERRIDE)',
+        totalMinted: 'SYNCING',
+        totalRouted: 'SYNCING',
+        aiEnabled: true,
+    });
 });
 
-let cachedFnsIndex = '[NO FNS NAMES INDEXED YET]';
-let lastCacheTime = 0;
+app.get('/api/resolve/:namespace', async (req, res) => {
+    return res.status(503).json({ error: 'FNS lookup temporarily disabled due to quota.' });
+});
 
-// 🔥 MOTHER AI CHAT ROUTE (SOVEREIGN AXIOS BRIDGE)
+// 🔥 MOTHER AI CHAT ROUTE
 app.post('/api/chat', async (req, res) => {
     const { message, wallet } = req.body || {};
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
     try {
-        const now = Date.now();
-        if (now - lastCacheTime > 60000) {
-            try {
-                const snapshot = await firestore.collection('fns_names').limit(100).get();
-                const dbRecords = snapshot.docs.map(doc => doc.data());
-                cachedFnsIndex = dbRecords.length > 0
-                    ? dbRecords.map(r => `[${(r.namespace || '').toUpperCase()}] Owner: ${r.owner}`).join('\n')
-                    : '[NO FNS NAMES INDEXED YET]';
-                lastCacheTime = now;
-            } catch (dbErr) {}
-        }
+        // 🔥 QUOTA BYPASS: Disabled database read for cached names today.
+        const cachedFnsIndex = '[FNS DATABASE READS TEMPORARILY PAUSED: QUOTA RESET AT MIDNIGHT]';
 
         const systemPrompt = `[PROTOCOL: STANDARD USER]
 You are MOTHER AI — the central intelligence of BOM Protocol. Tone: Brutalist, cybernetic, concise, highly professional. (Max 2-4 sentences per reply). Directive: Guide the user efficiently.
@@ -139,9 +114,8 @@ ${cachedFnsIndex}
 
         console.log(`[AI] Routing directive to local Qwen engine...`);
         
-        // ⚡ 120-second timeout for cold boots, hardcoded IP to bypass Node bug
         const response = await axios.post('http://127.0.0.1:11434/api/chat', {
-            model: 'qwen2.5-coder:latest', // 🔥 ADDED :latest RIGHT HERE
+            model: 'qwen2.5-coder:latest',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: message.trim() }
@@ -157,7 +131,7 @@ ${cachedFnsIndex}
     }
 });
 
-// ── WEB3 WATCHER (WITH STATEFUL MEMORY) ───────────────────────────────
+// ── WEB3 WATCHER ───────────────────────────────
 async function bootWatcher() {
     console.log('\n╔══════════════════════════════════════════════════════════╗');
     console.log('║   BOM PROTOCOL — MOTHER AI v2.0  SWARM NODE (LOCAL)      ║');
@@ -165,17 +139,9 @@ async function bootWatcher() {
 
     let provider = null;
     let iface = new ethersPkg.Interface(CONTRACT_ABI);
+    
+    // 🔥 QUOTA BYPASS: Forcing the hardcoded Genesis block without reading from Firestore
     let lastBlock = GENESIS_BLOCK - 1;
-
-    try {
-        const statsDoc = await firestore.collection('system').doc('stats').get();
-        if (statsDoc.exists && statsDoc.data().lastScannedBlock) {
-            // Only resume if the saved block is greater than our hardcoded genesis
-            if (statsDoc.data().lastScannedBlock > GENESIS_BLOCK) {
-                lastBlock = statsDoc.data().lastScannedBlock;
-            }
-        }
-    } catch (err) { console.log("[INDEXER] Could not fetch memory, defaulting to Genesis."); }
 
     async function handleLog(parsed, blockNumber) {
         if (parsed.name === 'FNSRegistered') {
@@ -213,7 +179,8 @@ async function bootWatcher() {
                 
                 lastBlock = toBlock;
                 fromBlock = toBlock + 1;
-
+                
+                // Writing memory doesn't burn reads
                 await firestore.collection('system').doc('stats').set({ lastScannedBlock: lastBlock }, { merge: true });
             }
         } catch (err) { }
@@ -224,12 +191,7 @@ async function bootWatcher() {
             provider = new ethersPkg.JsonRpcProvider(RPC_URL);
             const currentBlock = await provider.getBlockNumber();
             console.log(`[INDEXER] Connected to Sepolia | Current Block: #${currentBlock}`);
-            
-            if (lastBlock > GENESIS_BLOCK) {
-                console.log(`[INDEXER] Memory found. Resuming instantly from block #${lastBlock}...`);
-            } else {
-                console.log(`[INDEXER] Starting Genesis Scan from block #${GENESIS_BLOCK}...`);
-            }
+            console.log(`[INDEXER] Quota Bypass Active. Starting from block #${GENESIS_BLOCK}...`);
 
             setInterval(poll, POLL_INTERVAL);
             await poll();

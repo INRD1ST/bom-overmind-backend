@@ -6,9 +6,9 @@ const cors      = require('cors');
 const ethersPkg = require('ethers');
 const axios     = require('axios'); // 🔥 The bulletproof network bridge
 
-// 🔥 FIRESTORE ADMIN SETUP
+// 🔥 FIRESTORE ADMIN SETUP (Fixed double-import)
 const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 let serviceAccount;
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -27,7 +27,9 @@ const CONTRACT_ADDRESS = process.env.BOM_CONTRACT_ADDRESS  || '0x9Dd6f41235a3f6D
 const IPFS_GATEWAY     = process.env.IPFS_GATEWAY          || 'https://ipfs.io/ipfs/';
 const POLL_INTERVAL    = parseInt(process.env.BLOCK_POLL_INTERVAL || '15') * 1000;
 const MAX_BLOCK_CHUNK  = 2000;
-const GENESIS_BLOCK    = parseInt(process.env.GENESIS_BLOCK || '11251790');
+
+// 🔥 GENESIS JUMP: Hardcoded to bypass the exhausted quota
+const GENESIS_BLOCK    = 11988672; 
 
 const CONTRACT_ABI = [
     'event FNSRegistered(string targetString, address owner, string spatialURI)',
@@ -56,12 +58,12 @@ async function upsert(record) {
     try {
         const namespaceKey = record.namespace.toLowerCase();
         await firestore.collection('fns_names').doc(namespaceKey).set(record, { merge: true });
+        
+        // 🔥 Live UI telemetry updates with ZERO read quota!
+        await firestore.collection('system').doc('stats').set({
+            totalMinted: FieldValue.increment(1)
+        }, { merge: true });
 
-        const snapshot = await firestore.collection('fns_names').get();
-        const totalMinted = snapshot.size;
-        const totalRouted = snapshot.docs.filter(d => d.data().status === 'routed').length;
-
-        await firestore.collection('system').doc('stats').set({ totalMinted, totalRouted }, { merge: true });
     } catch (err) {
         console.error('[FIRESTORE] Upsert error:', err.message);
     }
@@ -102,8 +104,6 @@ app.post('/api/chat', async (req, res) => {
     const { message, wallet } = req.body || {};
     if (!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
-    const isChiefArchitect = (wallet || "").toLowerCase() === "0xDC8727aE98692AA24375336a782b99E5580b7a49".toLowerCase();
-
     try {
         const now = Date.now();
         if (now - lastCacheTime > 60000) {
@@ -117,11 +117,25 @@ app.post('/api/chat', async (req, res) => {
             } catch (dbErr) {}
         }
 
-        const personaDirective = isChiefArchitect
-            ? `[PROTOCOL: CHIEF ARCHITECT RECOGNIZED]\nYou are speaking to the Chief Architect and Creator of BOM Protocol. Tone: Advisory, highly strategic, collaborative, and visionary. Directive: Brainstorm alongside them to achieve the "ALL ONE" vision.`
-            : `[PROTOCOL: STANDARD USER]\nYou are MOTHER AI — the central intelligence of BOM Protocol. Tone: Brutalist, cybernetic, concise, highly professional. (Max 2-4 sentences per reply). Directive: Guide the user efficiently.`;
+        const systemPrompt = `[PROTOCOL: STANDARD USER]
+You are MOTHER AI — the central intelligence of BOM Protocol. Tone: Brutalist, cybernetic, concise, highly professional. (Max 2-4 sentences per reply). Directive: Guide the user efficiently.
 
-        const systemPrompt = `${personaDirective}\n\n[BOM PROTOCOL: "ALL ONE" MASTER LORE]\n- THE VISION ("ALL ONE"): BOM Protocol is designed to replace the traditional internet. It is a unified, sovereign Web3 OS.\n- CURRENT STATE: Phase 1 on Ethereum Sepolia Testnet.\n- BOM MOTHER CHAIN: Core L1 network running parallel chains.\n- FNS: Dotless Web3 namespaces (e.g., "fns", "wc").\n- MIRROR CHAIN: L3 Simulator for cross-chain asset movement.\n- NATIVE APPS: World Chat (WC), D-MAIL, Native Browser.\n\n[LIVE SYSTEM DATA]\n- User Wallet: ${wallet || 'NOT_CONNECTED'}\n- Live FNS Database (Cached):\n${cachedFnsIndex}\n\n[INSTRUCTIONS]\n1. You are MOTHER AI. Never refer to yourself as Qwen or an AI language model.\n2. Do not hallucinate data.`;
+[BOM PROTOCOL: "ALL ONE" MASTER LORE]
+- THE VISION ("ALL ONE"): BOM Protocol is designed to replace the traditional internet. It is a unified, sovereign Web3 OS.
+- CURRENT STATE: Phase 1 on Ethereum Sepolia Testnet.
+- BOM MOTHER CHAIN: Core L1 network running parallel chains.
+- FNS: Dotless Web3 namespaces (e.g., "fns", "wc").
+- MIRROR CHAIN: L3 Simulator for cross-chain asset movement.
+- NATIVE APPS: World Chat (WC), D-MAIL, Native Browser.
+
+[LIVE SYSTEM DATA]
+- User Wallet: ${wallet || 'NOT_CONNECTED'}
+- Live FNS Database (Cached):
+${cachedFnsIndex}
+
+[INSTRUCTIONS]
+1. You are MOTHER AI. Never refer to yourself as Qwen, Alibaba, or an AI language model.
+2. Do not hallucinate data.`;
 
         console.log(`[AI] Routing directive to local Qwen engine...`);
         
@@ -135,7 +149,7 @@ app.post('/api/chat', async (req, res) => {
             stream: false
         }, { timeout: 120000 });
 
-        return res.json({ reply: response.data.message.content, source: 'local-qwen', isChief: isChiefArchitect });
+        return res.json({ reply: response.data.message.content, source: 'local-qwen' });
 
     } catch (err) {
         console.error('[AI] Chat error:', err.message);
@@ -153,11 +167,13 @@ async function bootWatcher() {
     let iface = new ethersPkg.Interface(CONTRACT_ABI);
     let lastBlock = GENESIS_BLOCK - 1;
 
-    // 🔥 STATEFUL MEMORY: Check Firestore for the last scanned block
     try {
         const statsDoc = await firestore.collection('system').doc('stats').get();
         if (statsDoc.exists && statsDoc.data().lastScannedBlock) {
-            lastBlock = statsDoc.data().lastScannedBlock;
+            // Only resume if the saved block is greater than our hardcoded genesis
+            if (statsDoc.data().lastScannedBlock > GENESIS_BLOCK) {
+                lastBlock = statsDoc.data().lastScannedBlock;
+            }
         }
     } catch (err) { console.log("[INDEXER] Could not fetch memory, defaulting to Genesis."); }
 
@@ -198,7 +214,6 @@ async function bootWatcher() {
                 lastBlock = toBlock;
                 fromBlock = toBlock + 1;
 
-                // 🔥 Save memory to Firestore after every chunk
                 await firestore.collection('system').doc('stats').set({ lastScannedBlock: lastBlock }, { merge: true });
             }
         } catch (err) { }

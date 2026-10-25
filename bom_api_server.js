@@ -5,6 +5,41 @@ const express   = require('express');
 const cors      = require('cors');
 const ethersPkg = require('ethers');
 const axios     = require('axios'); 
+const fs = require('fs');
+const path = require('path');
+
+// ── SOVEREIGN VAULT (F: DRIVE) ARCHITECTURE ──
+const VAULT_ROOT = 'F:\\';
+
+const OS_DIRECTORIES = [
+    'Mother_Brain\\Memory',          // AI chat history and user context
+    'Mother_Brain\\Knowledge_Base',  // Scraped web data, lore, and RAG files
+    'BOM_Database\\FNS_Registry',    // Replaces Firebase for dotless domains
+    'BOM_Database\\Swarm_Logs',      // P2P network telemetry
+    'BOM_Database\\D_Mail',          // Encrypted decentralized mail
+    'BOM_Database\\World_Chat',      // Global public message logs
+    'BOM_Database\\Search_Index',    // Search bar queries and indexes
+    'BOM_Database\\Web_Metadata'     // Site structures for the native browser
+];
+
+function forgeSovereignVault() {
+    console.log('\n[GATEKEEPER] Scanning Sovereign Vault on F:\\...');
+    
+    OS_DIRECTORIES.forEach(dir => {
+        const fullPath = path.join(VAULT_ROOT, dir);
+        if (!fs.existsSync(fullPath)) {
+            fs.mkdirSync(fullPath, { recursive: true });
+            console.log(`[GATEKEEPER] Forged new sector: ${fullPath}`);
+        } else {
+            console.log(`[GATEKEEPER] Sector verified: ${fullPath}`);
+        }
+    });
+    
+    console.log('[GATEKEEPER] File system locked. The OS is anchored.\n');
+}
+
+// Execute the forge sequence immediately on boot
+forgeSovereignVault();
 
 // 🔥 FIRESTORE ADMIN SETUP
 const { initializeApp, cert } = require('firebase-admin/app');
